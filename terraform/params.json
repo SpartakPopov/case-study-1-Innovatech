@@ -1,0 +1,3 @@
+{
+  "commands": ["mysql -u appuser -p'AppUserPass2025!' -h localhost innovatech -e 'SHOW TABLES;'"]
+}

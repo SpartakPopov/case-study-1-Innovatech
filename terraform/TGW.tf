@@ -8,7 +8,7 @@ resource "aws_ec2_transit_gateway" "innovatech_tgw" {
 resource "aws_ec2_transit_gateway_vpc_attachment" "dmz_attachment" {
   transit_gateway_id = aws_ec2_transit_gateway.innovatech_tgw.id
   vpc_id              = aws_vpc.innovatech.id
-  subnet_ids          = [aws_subnet.dmz_public_a.id, aws_subnet.dmz_public_b.id]
+  subnet_ids          = [aws_subnet.tgw_attach.id]
 
   tags = {
     Name = "innovatech-dmz-tgw-attachment"

@@ -7,11 +7,12 @@ resource "aws_instance" "db" {
 
   user_data = <<-EOF
     #!/bin/bash
+    rpm --import https://repo.mysql.com/RPM-GPG-KEY-mysql-2023
     dnf install -y https://dev.mysql.com/get/mysql80-community-release-el9-1.noarch.rpm
     dnf install -y mysql-community-server
     systemctl enable --now mysqld
 
-    sleep 15
+    until grep -q 'temporary password' /var/log/mysqld.log 2>/dev/null; do sleep 2; done
     TEMP_PW=$(grep 'temporary password' /var/log/mysqld.log | awk '{print $NF}')
 
     mysql --connect-expired-password -u root -p"$TEMP_PW" <<SQL

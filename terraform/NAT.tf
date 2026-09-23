@@ -19,5 +19,5 @@ resource "aws_nat_gateway" "innovatech_nat" {
 resource "aws_route" "internal_default" {
   route_table_id         = aws_vpc.internal.default_route_table_id
   destination_cidr_block = "0.0.0.0/0"
-  nat_gateway_id          = aws_nat_gateway.innovatech_nat.id
+  transit_gateway_id     = aws_ec2_transit_gateway.innovatech_tgw.id
 }

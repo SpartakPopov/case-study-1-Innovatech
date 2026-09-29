@@ -52,6 +52,14 @@ resource "aws_instance" "monitoring" {
   iam_instance_profile   = aws_iam_instance_profile.monitoring_instance_profile.name
 
 
+  metadata_options {
+    http_tokens = "required"
+  }
+
+  root_block_device {
+    encrypted = true
+  }
+
   user_data_replace_on_change = true
 
   user_data = <<-EOF

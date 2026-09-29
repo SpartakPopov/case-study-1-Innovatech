@@ -2,3 +2,6 @@
 .terraform
 *.tfstate
 *.tfstate.backup
+# Terraform build output and saved plans
+build/
+tfplan

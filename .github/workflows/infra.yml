@@ -5,17 +5,32 @@ on:
     paths:
       - "terraform/**"
       - ".github/workflows/infra.yml"
+      - ".github/scripts/**"
   push:
     branches: [main]
     paths:
       - "terraform/**"
       - ".github/workflows/infra.yml"
+      - ".github/scripts/**"
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# One Terraform run at a time. Never cancel a running one: killing an apply
+# halfway leaves resources half-created and the state locked.
+concurrency:
+  group: terraform
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: eu-central-1
+  TF_IN_AUTOMATION: "true"
+
 jobs:
+  # ---------------------------------------------------------------------------
+  # Stage 1: static checks. GitHub-hosted, no AWS access needed.
+  # ---------------------------------------------------------------------------
   validate:
     name: Validate
     runs-on: ubuntu-latest
@@ -39,3 +54,142 @@ jobs:
 
       - name: Validate
         run: terraform validate
+
+      - name: Install tflint
+        uses: terraform-linters/setup-tflint@v4
+
+      - name: tflint
+        run: |
+          tflint --init
+          tflint --format compact
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  security-scan:
+    name: Security scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+
+      - name: Install checkov
+        run: pip install checkov
+
+      # --soft-fail: report only, for now. Remove once the findings are triaged
+      # so new security problems block the pipeline.
+      - name: checkov
+        run: checkov --directory terraform --framework terraform secrets --compact --soft-fail
+
+  # ---------------------------------------------------------------------------
+  # Stage 2: plan. Self-hosted runner (has AWS access through its IAM role).
+  # ---------------------------------------------------------------------------
+  plan:
+    name: Plan
+    needs: [validate, security-scan]
+    # Fork guard: a stranger's PR must never run code on the runner with AWS access
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, innovatech]
+    defaults:
+      run:
+        working-directory: terraform
+    outputs:
+      has_changes: ${{ steps.plan.outputs.has_changes }}
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+
+      - name: Init
+        run: terraform init -input=false
+
+      # -detailed-exitcode: 0 = no changes, 1 = error, 2 = changes
+      - name: Plan
+        id: plan
+        run: |
+          set +e
+          terraform plan -input=false -lock-timeout=5m -detailed-exitcode -out=tfplan
+          code=$?
+          set -e
+          if [ "$code" -eq 1 ]; then exit 1; fi
+          if [ "$code" -eq 2 ]; then
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Write plan to run summary
+        run: |
+          terraform show -no-color tfplan > plan.txt
+          {
+            echo "## Terraform plan"
+            echo
+            echo '```'
+            grep -E '^(Plan:|No changes)' plan.txt || true
+            echo '```'
+            echo
+            echo "<details><summary>Full plan</summary>"
+            echo
+            echo '```'
+            cat plan.txt
+            echo '```'
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # The Lambda zip is built during plan and read during apply,
+      # so it travels together with the saved plan.
+      - name: Upload saved plan
+        if: steps.plan.outputs.has_changes == 'true' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: |
+            terraform/tfplan
+            terraform/build/
+          retention-days: 5
+
+  # ---------------------------------------------------------------------------
+  # Stage 3: apply the exact reviewed plan. Only on main, only with changes,
+  # and only after approval on the "production" environment.
+  # ---------------------------------------------------------------------------
+  apply:
+    name: Apply
+    needs: plan
+    if: needs.plan.outputs.has_changes == 'true' && github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: [self-hosted, innovatech]
+    environment: production
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+
+      - name: Download saved plan
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan
+          path: terraform
+
+      - name: Init
+        run: terraform init -input=false
+
+      - name: Apply
+        run: terraform apply -input=false -lock-timeout=5m tfplan
+
+  # ---------------------------------------------------------------------------
+  # Stage 4: prove it works. "apply succeeded" only means AWS accepted the API
+  # calls; this checks the site actually serves pages backed by the database.
+  # ---------------------------------------------------------------------------
+  verify:
+    name: Verify
+    needs: apply
+    runs-on: [self-hosted, innovatech]
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+
+      - name: Init
+        working-directory: terraform
+        run: terraform init -input=false
+
+      - name: Health checks
+        run: bash .github/scripts/verify.sh

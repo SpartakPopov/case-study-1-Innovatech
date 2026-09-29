@@ -12,7 +12,8 @@ locals {
 
   index_php = <<-PHP
     <?php
-    $conn = new mysqli("${aws_instance.db.private_ip}", "appuser", "AppUserPass2025!", "innovatech");
+    $cfg = parse_ini_file("/etc/innovatech/db.ini");
+    $conn = new mysqli($cfg["host"], $cfg["user"], $cfg["password"], $cfg["name"]);
     if ($conn->connect_error) {
         die("<h1>Database connection failed: " . $conn->connect_error . "</h1>");
     }
@@ -38,11 +39,36 @@ resource "aws_launch_template" "web_lt" {
 
   vpc_security_group_ids = [aws_security_group.web_sg.id]
 
+  metadata_options {
+    http_tokens = "required"
+  }
+
+  block_device_mappings {
+    device_name = "/dev/xvda"
+    ebs {
+      volume_size = 8
+      volume_type = "gp3"
+      encrypted   = true
+    }
+  }
+
   user_data = base64encode(<<-EOF
     #!/bin/bash
     dnf install -y nginx php-fpm php-mysqlnd
     systemctl enable --now nginx
     systemctl enable --now php-fpm
+
+    # DB connection settings, outside the web root. Password comes from SSM at boot.
+    until DB_PW=$(aws ssm get-parameter --region eu-central-1 --name ${aws_ssm_parameter.db_app_password.name} --with-decryption --query Parameter.Value --output text); do sleep 5; done
+    mkdir -p /etc/innovatech
+    cat > /etc/innovatech/db.ini <<INI
+    host = "${aws_instance.db.private_ip}"
+    user = "appuser"
+    password = "$DB_PW"
+    name = "innovatech"
+    INI
+    chown root:apache /etc/innovatech/db.ini
+    chmod 640 /etc/innovatech/db.ini
 
     mkdir -p /etc/nginx/default.d
     echo "${base64encode(local.nginx_php_conf)}" | base64 -d > /etc/nginx/default.d/php.conf

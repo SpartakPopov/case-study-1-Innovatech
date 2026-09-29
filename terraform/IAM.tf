@@ -23,6 +23,25 @@ resource "aws_iam_role_policy_attachment" "ssm_core" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
+resource "aws_iam_role_policy" "read_db_passwords" {
+  name = "innovatech-read-db-passwords"
+  role = aws_iam_role.ec2_ssm_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = ["ssm:GetParameter"]
+        Resource = [
+          aws_ssm_parameter.db_root_password.arn,
+          aws_ssm_parameter.db_app_password.arn,
+        ]
+      }
+    ]
+  })
+}
+
 resource "aws_iam_instance_profile" "ec2_ssm_profile" {
   name = "innovatech-ec2-ssm-profile"
   role = aws_iam_role.ec2_ssm_role.name

@@ -5,8 +5,20 @@ resource "aws_instance" "db" {
   vpc_security_group_ids = [aws_security_group.data_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_ssm_profile.name
 
+  metadata_options {
+    http_tokens = "required"
+  }
+
+  root_block_device {
+    encrypted = true
+  }
+
   user_data = <<-EOF
     #!/bin/bash
+    # Retry: the instance role's credentials can take a few seconds to become available
+    until ROOT_PW=$(aws ssm get-parameter --region eu-central-1 --name ${aws_ssm_parameter.db_root_password.name} --with-decryption --query Parameter.Value --output text); do sleep 5; done
+    until APP_PW=$(aws ssm get-parameter --region eu-central-1 --name ${aws_ssm_parameter.db_app_password.name} --with-decryption --query Parameter.Value --output text); do sleep 5; done
+
     dnf install -y https://dev.mysql.com/get/mysql80-community-release-el9-1.noarch.rpm
     sed -i 's#gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-mysql-2022#gpgkey=https://repo.mysql.com/RPM-GPG-KEY-mysql-2023#' /etc/yum.repos.d/mysql-community.repo
     dnf install -y mysql-community-server
@@ -16,9 +28,9 @@ resource "aws_instance" "db" {
     TEMP_PW=$(grep 'temporary password' /var/log/mysqld.log | awk '{print $NF}')
 
     mysql --connect-expired-password -u root -p"$TEMP_PW" <<SQL
-    ALTER USER 'root'@'localhost' IDENTIFIED BY 'Innovatech2025!';
+    ALTER USER 'root'@'localhost' IDENTIFIED BY '$ROOT_PW';
     CREATE DATABASE innovatech;
-    CREATE USER 'appuser'@'%' IDENTIFIED BY 'AppUserPass2025!';
+    CREATE USER 'appuser'@'%' IDENTIFIED BY '$APP_PW';
     GRANT ALL PRIVILEGES ON innovatech.* TO 'appuser'@'%';
     FLUSH PRIVILEGES;
     USE innovatech;

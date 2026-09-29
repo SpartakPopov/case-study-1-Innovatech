@@ -1,7 +1,9 @@
 data "archive_file" "target_registration_zip" {
   type        = "zip"
   source_file = "${path.module}/lambda_src/target_registration.py"
-  output_path = "${path.module}/lambda_src/target_registration.zip"
+  output_path = "${path.module}/build/target_registration.zip"
+  # Fixed file mode so Windows and Linux produce an identical zip (and hash)
+  output_file_mode = "0666"
 }
 
 resource "aws_iam_role" "lambda_target_reg_role" {

@@ -32,11 +32,11 @@ resource "aws_subnet" "data" {
   }
 }
 
-resource "aws_subnet" "management" {
+resource "aws_subnet" "monitoring" {
   vpc_id            = aws_vpc.internal.id
   cidr_block        = "10.0.3.128/25"
   availability_zone = "eu-central-1a"
   tags = {
-    Name = "innovatech-management-subnet"
+    Name = "innovatech-monitoring-subnet"
   }
 }

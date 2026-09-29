@@ -1,6 +1,6 @@
 resource "aws_security_group" "data_sg" {
   name        = "innovatech-data-sg"
-  description = "Allow DB traffic from Web tier and metrics scraping from Management"
+  description = "Allow DB traffic from Web tier and metrics scraping from monitoring"
   vpc_id      = aws_vpc.internal.id
 
   ingress {
@@ -12,11 +12,11 @@ resource "aws_security_group" "data_sg" {
   }
 
   ingress {
-    description     = "Node exporter metrics from Management (Prometheus scrape)"
+    description     = "Node exporter metrics from monitoring (Prometheus scrape)"
     from_port       = 9100
     to_port         = 9100
     protocol        = "tcp"
-    security_groups = [aws_security_group.management_sg.id]
+    security_groups = [aws_security_group.monitoring_sg.id]
   }
 
   egress {

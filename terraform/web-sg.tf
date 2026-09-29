@@ -1,10 +1,10 @@
 
 resource "aws_security_group" "web_sg" {
   name        = "innovatech-web-sg"
-  description = "Allow HTTP from ALB and metrics scraping from Management"
+  description = "Allow HTTP from ALB and metrics scraping from monitoring"
   vpc_id      = aws_vpc.internal.id
 
-    ingress {
+  ingress {
     description = "HTTP from ALB (DMZ subnets)"
     from_port   = 80
     to_port     = 80
@@ -13,11 +13,11 @@ resource "aws_security_group" "web_sg" {
   }
 
   ingress {
-    description     = "Node exporter metrics from Management (Prometheus scrape)"
+    description     = "Node exporter metrics from monitoring (Prometheus scrape)"
     from_port       = 9100
     to_port         = 9100
     protocol        = "tcp"
-    security_groups = [aws_security_group.management_sg.id]
+    security_groups = [aws_security_group.monitoring_sg.id]
   }
 
   egress {

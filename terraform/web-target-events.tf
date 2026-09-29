@@ -6,7 +6,7 @@ resource "aws_cloudwatch_event_rule" "asg_lifecycle" {
     source      = ["aws.autoscaling"]
     detail-type = ["EC2 Instance-launch Lifecycle Action", "EC2 Instance-terminate Lifecycle Action"]
     detail = {
-      AutoScalingGroupName = [aws_autoscaling_group.web_asg.name]
+      AutoScalingGroupName = ["innovatech-web-asg"]
     }
   })
 }

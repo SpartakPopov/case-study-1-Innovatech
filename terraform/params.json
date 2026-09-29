@@ -1,3 +1,10 @@
+
 {
-  "commands": ["mysql -u appuser -p'AppUserPass2025!' -h localhost innovatech -e 'SHOW TABLES;'"]
+  "commands": [
+    "systemctl is-active nginx php-fpm",
+    "ls -la /usr/share/nginx/html/",
+    "cat /etc/nginx/default.d/php.conf",
+    "cat /usr/share/nginx/html/index.php",
+    "tail -40 /var/log/cloud-init-output.log"
+  ]
 }

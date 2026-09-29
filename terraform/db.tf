@@ -71,3 +71,4 @@ resource "aws_instance" "db" {
     Name = "innovatech-db"
   }
 }
+

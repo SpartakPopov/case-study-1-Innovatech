@@ -20,7 +20,8 @@ resource "aws_security_group" "alb_sg" {
   }
 
   tags = {
-    Name = "innovatech-alb-sg"
+    Name      = "innovatech-web-alb"
+    ManagedBy = "terraform-pipeline"
   }
 }
 

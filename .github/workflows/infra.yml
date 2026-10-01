@@ -17,8 +17,6 @@ on:
 permissions:
   contents: read
 
-# One Terraform run at a time. Never cancel a running one: killing an apply
-# halfway leaves resources half-created and the state locked.
 concurrency:
   group: terraform
   cancel-in-progress: false
@@ -28,9 +26,6 @@ env:
   TF_IN_AUTOMATION: "true"
 
 jobs:
-  # ---------------------------------------------------------------------------
-  # Stage 1: static checks. GitHub-hosted, no AWS access needed.
-  # ---------------------------------------------------------------------------
   validate:
     name: Validate
     runs-on: ubuntu-latest
@@ -75,18 +70,13 @@ jobs:
       - name: Install checkov
         run: pip install checkov
 
-      # --soft-fail: report only, for now. Remove once the findings are triaged
-      # so new security problems block the pipeline.
+     
       - name: checkov
         run: checkov --directory terraform --framework terraform secrets --compact --soft-fail
 
-  # ---------------------------------------------------------------------------
-  # Stage 2: plan. Self-hosted runner (has AWS access through its IAM role).
-  # ---------------------------------------------------------------------------
   plan:
     name: Plan
     needs: [validate, security-scan]
-    # Fork guard: a stranger's PR must never run code on the runner with AWS access
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, innovatech]
     defaults:
@@ -101,7 +91,6 @@ jobs:
       - name: Init
         run: terraform init -input=false
 
-      # -detailed-exitcode: 0 = no changes, 1 = error, 2 = changes
       - name: Plan
         id: plan
         run: |
@@ -134,8 +123,7 @@ jobs:
             echo "</details>"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      # The Lambda zip is built during plan and read during apply,
-      # so it travels together with the saved plan.
+      
       - name: Upload saved plan
         if: steps.plan.outputs.has_changes == 'true' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
@@ -146,10 +134,7 @@ jobs:
             terraform/build/
           retention-days: 5
 
-  # ---------------------------------------------------------------------------
-  # Stage 3: apply the exact reviewed plan. Only on main, only with changes,
-  # and only after approval on the "production" environment.
-  # ---------------------------------------------------------------------------
+  
   apply:
     name: Apply
     needs: plan
@@ -175,10 +160,7 @@ jobs:
       - name: Apply
         run: terraform apply -input=false -lock-timeout=5m tfplan
 
-  # ---------------------------------------------------------------------------
-  # Stage 4: prove it works. "apply succeeded" only means AWS accepted the API
-  # calls; this checks the site actually serves pages backed by the database.
-  # ---------------------------------------------------------------------------
+  
   verify:
     name: Verify
     needs: apply

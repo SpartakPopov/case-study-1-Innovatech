@@ -1,10 +1,8 @@
 name: Drift detection
 
-# Nightly check: does real AWS still match the code? Catches console clicks and
-# manual fixes that never made it back into Terraform.
 on:
   schedule:
-    - cron: "0 6 * * *" # 06:00 UTC daily
+    - cron: "0 6 * * *"
   workflow_dispatch:
 
 permissions:
@@ -37,7 +35,6 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # Environment torn down on purpose: nothing to compare against.
           if [ -z "$(terraform state list)" ]; then
             echo "State is empty (environment not deployed). Skipping."
             exit 0
@@ -55,7 +52,6 @@ jobs:
           fi
           if [ "$code" -eq 1 ]; then exit 1; fi
 
-          # Drift found: open an issue, unless one is already open
           summary_line=$(grep -E '^Plan:' plan.txt || echo "Changes detected")
           run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           api="https://api.github.com/repos/$GITHUB_REPOSITORY/issues"

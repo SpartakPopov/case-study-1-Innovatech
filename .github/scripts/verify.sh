@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
-# Post-apply verification: the ALB has enough healthy targets, and the page it
-# serves was rendered with data from the database (web -> DB works end to end).
 set -euo pipefail
 
-TIMEOUT_SECONDS=900   # fresh environments need time: instances boot, MySQL installs
+TIMEOUT_SECONDS=900
 POLL_SECONDS=20
 
 cd terraform
@@ -14,7 +12,6 @@ MIN_HEALTHY=$(terraform output -raw asg_min_size)
 summary() { echo "$1" >> "$GITHUB_STEP_SUMMARY"; }
 summary "## Post-apply verification"
 
-# --- Check 1: target group health (proves instances booted and the Lambda registered them)
 echo "Waiting for at least $MIN_HEALTHY healthy targets..."
 deadline=$((SECONDS + TIMEOUT_SECONDS))
 while true; do
@@ -31,8 +28,7 @@ while true; do
 done
 summary "- ✅ $healthy healthy targets in the target group"
 
-# --- Check 2: the page through the ALB shows data from the database.
-# nginx answers 200 even when PHP can't reach MySQL, so check the content, not the status.
+# nginx answers 200 even when PHP can't reach MySQL, so check the page content
 echo "Checking http://$ALB_DNS/ ..."
 deadline=$((SECONDS + TIMEOUT_SECONDS))
 while true; do

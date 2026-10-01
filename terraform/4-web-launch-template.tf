@@ -30,7 +30,7 @@ locals {
 
 resource "aws_launch_template" "web_lt" {
   name_prefix   = "innovatech-web-"
-  image_id      = "ami-0669b163befffbdfc" # Amazon Linux 2023, eu-central-1 - verify this is current before applying
+  image_id      = "ami-0669b163befffbdfc"
   instance_type = "t3.micro"
 
   iam_instance_profile {
@@ -58,7 +58,6 @@ resource "aws_launch_template" "web_lt" {
     systemctl enable --now nginx
     systemctl enable --now php-fpm
 
-    # DB connection settings, outside the web root. Password comes from SSM at boot.
     until DB_PW=$(aws ssm get-parameter --region eu-central-1 --name ${aws_ssm_parameter.db_app_password.name} --with-decryption --query Parameter.Value --output text); do sleep 5; done
     mkdir -p /etc/innovatech
     cat > /etc/innovatech/db.ini <<INI

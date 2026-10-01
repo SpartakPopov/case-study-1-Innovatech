@@ -12,14 +12,11 @@ resource "aws_autoscaling_group" "web_asg" {
   ]
 
 
-  # A concrete version number (not "$Latest") so a launch template change is a
-  # change to the ASG, which is what triggers the instance refresh below.
   launch_template {
     id      = aws_launch_template.web_lt.id
     version = aws_launch_template.web_lt.latest_version
   }
 
-  # Rolling replacement when the launch template changes, keeping half the fleet serving.
   instance_refresh {
     strategy = "Rolling"
     preferences {

@@ -129,7 +129,6 @@ resource "aws_instance" "runner" {
     #!/bin/bash
     set -euo pipefail
 
-    # --- 1. Tools the pipeline needs ---
     dnf install -y git jq unzip tar libicu
 
     TF_VERSION="1.15.6"
@@ -137,7 +136,6 @@ resource "aws_instance" "runner" {
       https://releases.hashicorp.com/terraform/$${TF_VERSION}/terraform_$${TF_VERSION}_linux_amd64.zip
     unzip -o /tmp/terraform.zip -d /usr/local/bin/
 
-    # --- 2. Download the GitHub Actions runner agent ---
     useradd --create-home runner
     RUNNER_VERSION=$(curl -sSf --retry 5 https://api.github.com/repos/actions/runner/releases/latest | jq -r .tag_name | sed 's/^v//')
     mkdir -p /home/runner/actions-runner
@@ -147,7 +145,6 @@ resource "aws_instance" "runner" {
     tar xzf runner.tar.gz
     chown -R runner:runner /home/runner/actions-runner
 
-    # --- 3. Read the PAT from SSM, swap it for a short-lived registration token ---
     PAT=$(aws ssm get-parameter --region eu-central-1 --name /innovatech/ci/github-pat \
       --with-decryption --query Parameter.Value --output text)
     REG_TOKEN=$(curl -sSf -X POST \
@@ -156,7 +153,6 @@ resource "aws_instance" "runner" {
       https://api.github.com/repos/SpartakPopov/case-study-1-Innovatech/actions/runners/registration-token \
       | jq -r .token)
 
-    # --- 4. Register with the repo and run as a service ---
     sudo -u runner ./config.sh --unattended --replace \
       --url https://github.com/SpartakPopov/case-study-1-Innovatech \
       --token "$REG_TOKEN" \

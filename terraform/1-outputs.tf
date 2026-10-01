@@ -1,5 +1,3 @@
-# Used by the pipeline's post-apply verification (.github/scripts/verify.sh)
-
 output "alb_dns_name" {
   value = aws_lb.web_alb.dns_name
 }

@@ -1,5 +1,5 @@
 resource "aws_instance" "db" {
-  ami                    = "ami-0669b163befffbdfc" # Amazon Linux 2023, eu-central-1 - verify this is current before applying
+  ami                    = "ami-0669b163befffbdfc"
   instance_type          = "t3.small"
   subnet_id              = aws_subnet.data.id
   vpc_security_group_ids = [aws_security_group.data_sg.id]
@@ -15,7 +15,6 @@ resource "aws_instance" "db" {
 
   user_data = <<-EOF
     #!/bin/bash
-    # Retry: the instance role's credentials can take a few seconds to become available
     until ROOT_PW=$(aws ssm get-parameter --region eu-central-1 --name ${aws_ssm_parameter.db_root_password.name} --with-decryption --query Parameter.Value --output text); do sleep 5; done
     until APP_PW=$(aws ssm get-parameter --region eu-central-1 --name ${aws_ssm_parameter.db_app_password.name} --with-decryption --query Parameter.Value --output text); do sleep 5; done
 

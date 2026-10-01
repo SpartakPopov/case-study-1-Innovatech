@@ -34,6 +34,11 @@ resource "aws_iam_role_policy" "monitoring_policy" {
         ]
         Resource = "*"
       },
+      {
+        Effect   = "Allow"
+        Action   = ["ssm:GetParameter"]
+        Resource = aws_ssm_parameter.grafana_admin_password.arn
+      },
     ]
   })
 }
@@ -45,7 +50,7 @@ resource "aws_iam_instance_profile" "monitoring_instance_profile" {
 
 
 resource "aws_instance" "monitoring" {
-  ami                    = "ami-0669b163befffbdfc" # Amazon Linux 2023, eu-central-1 - verify this is current before applying
+  ami                    = "ami-0669b163befffbdfc"
   instance_type          = "t3.small"
   subnet_id              = aws_subnet.monitoring.id
   vpc_security_group_ids = [aws_security_group.monitoring_sg.id]
@@ -64,7 +69,6 @@ resource "aws_instance" "monitoring" {
 
   user_data = <<-EOF
     #!/bin/bash
-    # --- Prometheus ---
     VER="3.15.0"
     cd /tmp
     curl -sSfL --retry 10 --retry-delay 10 --retry-all-errors -O https://github.com/prometheus/prometheus/releases/download/v$${VER}/prometheus-$${VER}.linux-amd64.tar.gz
@@ -94,7 +98,6 @@ resource "aws_instance" "monitoring" {
     systemctl daemon-reload
     systemctl enable --now prometheus
 
-        # --- Grafana ---
     cat > /etc/yum.repos.d/grafana.repo <<'REPO'
     [grafana]
     name=grafana
@@ -111,7 +114,15 @@ resource "aws_instance" "monitoring" {
 
     mkdir -p /etc/grafana/provisioning/datasources
     echo "${base64encode(file("${path.module}/grafana.yml"))}" | base64 -d > /etc/grafana/provisioning/datasources/prometheus.yml
+    mkdir -p /etc/grafana/provisioning/dashboards /var/lib/grafana/dashboards
+    echo "${base64encode(file("${path.module}/grafana-dashboards.yml"))}" | base64 -d > /etc/grafana/provisioning/dashboards/innovatech.yml
+    echo "${base64gzip(file("${path.module}/grafana-dashboard.json"))}" | base64 -d | gunzip > /var/lib/grafana/dashboards/innovatech-overview.json
     chown -R root:grafana /etc/grafana/provisioning
+    chown -R grafana:grafana /var/lib/grafana/dashboards
+
+    # Admin password from SSM; Grafana applies it when it creates its database on first start
+    until GF_PW=$(aws ssm get-parameter --region eu-central-1 --name ${aws_ssm_parameter.grafana_admin_password.name} --with-decryption --query Parameter.Value --output text); do sleep 5; done
+    echo "GF_SECURITY_ADMIN_PASSWORD=$GF_PW" >> /etc/sysconfig/grafana-server
 
     systemctl enable --now grafana-server
 

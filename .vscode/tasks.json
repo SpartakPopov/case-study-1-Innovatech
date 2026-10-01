@@ -1,0 +1,27 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Open Grafana tunnel (localhost:3000)",
+      "type": "shell",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/monitoring-tunnel.ps1 grafana",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "Open Prometheus tunnel (localhost:9090)",
+      "type": "shell",
+      "command": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/monitoring-tunnel.ps1 prometheus",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": {
+        "panel": "dedicated",
+        "reveal": "always"
+      }
+    }
+  ]
+}
